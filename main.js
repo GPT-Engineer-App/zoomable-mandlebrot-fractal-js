@@ -17,17 +17,15 @@ const ctx = canvas.getContext("2d");
 
 // Mandelbrot calculation function
 function mandelbrot(x, y) {
-  let a = (x - width / 2) / (0.5 * zoom * width) + panX;
-  let b = (y - height / 2) / (0.5 * zoom * height) + panY;
-  let a2 = a * a;
-  let b2 = b * b;
+  let cr = (x - width / 2) / (0.5 * zoom * width) + panX;
+  let ci = (y - height / 2) / (0.5 * zoom * height) + panY;
+  let zr = 0;
+  let zi = 0;
   let n = 0;
-  while (a2 + b2 < 4 && n < maxIterations) {
-    let temp = a2 - b2 + x;
-    b = 2 * a * b + y;
-    a = temp;
-    a2 = a * a;
-    b2 = b * b;
+  while (zr * zr + zi * zi < 4 && n < maxIterations) {
+    let temp = zr * zr - zi * zi + cr;
+    zi = 2 * zr * zi + ci;
+    zr = temp;
     n++;
   }
   return n;
