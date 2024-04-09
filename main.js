@@ -30,12 +30,13 @@ const fragmentShaderSource = `
   uniform int u_colorMode;
 
   vec3 getColor(int iterations) {
+    float t = float(iterations) / float(u_maxIterations);
     if (u_colorMode == 0) {
-      return vec3(0.5 + 0.5 * cos(3.0 + float(iterations) * 0.15));
+      return vec3(0.5 + 0.5 * cos(3.0 + t * 10.0));
     } else if (u_colorMode == 1) {
-      return vec3(float(iterations) * 0.02, 1.0 - float(iterations) * 0.02, 0.0);
+      return vec3(t, 1.0 - t, 0.0);
     } else {
-      return vec3(1.0 - float(iterations) * 0.02, float(iterations) * 0.02, float(iterations) * 0.02);
+      return vec3(1.0 - t, t, t);
     }
   }
 
