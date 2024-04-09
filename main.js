@@ -1,9 +1,7 @@
-// Constants
 const canvas = document.getElementById("fractal-canvas");
 const resetBtn = document.getElementById("reset-btn");
 const colorBtn = document.getElementById("color-btn");
 
-// Fractal parameters
 let width = (canvas.width = 800);
 let height = (canvas.height = 600);
 let maxIterations = 100;
@@ -12,46 +10,97 @@ let panX = 0;
 let panY = 0;
 let colorMode = 0;
 
-// Get the 2D rendering context
-const ctx = canvas.getContext("2d");
+const gl = canvas.getContext("webgl");
 
-// Mandelbrot calculation function
-function mandelbrot(x, y) {
-  let cr = (x - width / 2) / (0.5 * zoom * width) + panX;
-  let ci = (y - height / 2) / (0.5 * zoom * height) + panY;
-  let zr = 0;
-  let zi = 0;
-  let n = 0;
-  while (zr * zr + zi * zi < 4 && n < maxIterations) {
-    let temp = zr * zr - zi * zi + cr;
-    zi = 2 * zr * zi + ci;
-    zr = temp;
-    n++;
+const vertexShaderSource = `
+  attribute vec2 a_position;
+  void main() {
+    gl_Position = vec4(a_position, 0.0, 1.0);
   }
-  return n;
-}
+`;
+
+const fragmentShaderSource = `
+  precision highp float;
+  uniform float u_width;
+  uniform float u_height;
+  uniform float u_zoom;
+  uniform float u_panX;
+  uniform float u_panY;
+  uniform int u_maxIterations;
+  uniform int u_colorMode;
+
+  vec3 getColor(int iterations) {
+    if (u_colorMode == 0) {
+      return vec3(0.5 + 0.5 * cos(3.0 + float(iterations) * 0.15));
+    } else if (u_colorMode == 1) {
+      return vec3(float(iterations) * 0.02, 1.0 - float(iterations) * 0.02, 0.0);
+    } else {
+      return vec3(1.0 - float(iterations) * 0.02, float(iterations) * 0.02, float(iterations) * 0.02);
+    }
+  }
+
+  void main() {
+    float x = (gl_FragCoord.x - u_width / 2.0) / (0.5 * u_zoom * u_width) + u_panX;
+    float y = (gl_FragCoord.y - u_height / 2.0) / (0.5 * u_zoom * u_height) + u_panY;
+
+    float zr = 0.0;
+    float zi = 0.0;
+    int iterations = 0;
+    while (zr * zr + zi * zi < 4.0 && iterations < u_maxIterations) {
+      float temp = zr * zr - zi * zi + x;
+      zi = 2.0 * zr * zi + y;
+      zr = temp;
+      iterations++;
+    }
+
+    vec3 color = iterations == u_maxIterations ? vec3(0.0) : getColor(iterations);
+    gl_FragColor = vec4(color, 1.0);
+  }
+`;
+
+const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+gl.shaderSource(vertexShader, vertexShaderSource);
+gl.compileShader(vertexShader);
+
+const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+gl.shaderSource(fragmentShader, fragmentShaderSource);
+gl.compileShader(fragmentShader);
+
+const program = gl.createProgram();
+gl.attachShader(program, vertexShader);
+gl.attachShader(program, fragmentShader);
+gl.linkProgram(program);
+gl.useProgram(program);
+
+const positions = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+
+const positionBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+
+const positionAttributeLocation = gl.getAttribLocation(program, "a_position");
+gl.enableVertexAttribArray(positionAttributeLocation);
+gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
+
+const widthUniformLocation = gl.getUniformLocation(program, "u_width");
+const heightUniformLocation = gl.getUniformLocation(program, "u_height");
+const zoomUniformLocation = gl.getUniformLocation(program, "u_zoom");
+const panXUniformLocation = gl.getUniformLocation(program, "u_panX");
+const panYUniformLocation = gl.getUniformLocation(program, "u_panY");
+const maxIterationsUniformLocation = gl.getUniformLocation(program, "u_maxIterations");
+const colorModeUniformLocation = gl.getUniformLocation(program, "u_colorMode");
 
 // Render the fractal
 function renderFractal() {
-  for (let x = 0; x < width; x++) {
-    for (let y = 0; y < height; y++) {
-      let iterations = mandelbrot(x, y);
-      let color;
-      switch (colorMode) {
-        case 0:
-          color = `hsl(${iterations * 2}, 100%, 50%)`;
-          break;
-        case 1:
-          color = `rgb(${iterations * 2}, ${255 - iterations * 2}, 0)`;
-          break;
-        case 2:
-          color = `rgb(${255 - iterations * 2}, ${iterations * 2}, ${iterations * 2})`;
-          break;
-      }
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y, 1, 1);
-    }
-  }
+  gl.uniform1f(widthUniformLocation, width);
+  gl.uniform1f(heightUniformLocation, height);
+  gl.uniform1f(zoomUniformLocation, zoom);
+  gl.uniform1f(panXUniformLocation, panX);
+  gl.uniform1f(panYUniformLocation, panY);
+  gl.uniform1i(maxIterationsUniformLocation, maxIterations);
+  gl.uniform1i(colorModeUniformLocation, colorMode);
+
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
 // Handle zooming and panning
